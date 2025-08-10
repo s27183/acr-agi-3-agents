@@ -27,3 +27,7 @@ agents/rl/logs
 
 # virtual envs
 .venv
+
+# IDE and editors
+.idea
+.vscode
