@@ -541,10 +541,10 @@ class ARCGridEnvironment(gym.Env):
     
     def _calculate_reward(self, score_delta: int, state: GameState, action: int, current_grid: Optional[np.ndarray], change_analysis: Optional[Dict] = None) -> Tuple[float, bool]:
         """
-        Simple pixel-based rewards with level completion flag.
+        Natural log-scaled pixel-based rewards with level completion flag.
         
         Returns:
-            Tuple[float, bool]: (reward, is_level_complete)
+            Tuple[float, bool]: (log_scaled_reward, is_level_complete)
         """
         # Check if we have the necessary data
         if current_grid is None or self.previous_grid is None:
@@ -554,19 +554,29 @@ class ARCGridEnvironment(gym.Env):
         # Calculate total pixel changes
         total_changes = np.sum(current_grid != self.previous_grid)
         
+        # Apply natural log scaling for reward smoothing, but filter out life loss events
+        if total_changes == 0:
+            log_reward = 0.0
+        elif total_changes >= 3000:
+            # Large pixel changes likely indicate life loss - give zero reward
+            log_reward = 0.0
+            logger.debug(f"Life loss detected: {total_changes} pixels → 0.0 reward (no penalty)")
+        else:
+            log_reward = float(np.log(total_changes + 1))
+        
         # Level completion detection
         if score_delta > 0:
-            # Return pixel changes + flag for trajectory distribution
-            logger.debug(f"Level completion detected: total_changes={total_changes}")
-            return float(total_changes), True
+            # Return log-scaled reward + flag for trajectory distribution
+            logger.info(f"Level completion detected: {total_changes} pixels → {log_reward:.2f} log reward")
+            return log_reward, True
         
         # Terminal states - no special handling
         if state in [GameState.WIN, GameState.GAME_OVER]:
             return 0.0, False
         
-        # Normal exploration - pixel change rewards
-        logger.debug(f"Normal step: total_changes={total_changes}, reward={total_changes:.1f}")
-        return float(total_changes), False
+        # Normal exploration - log-scaled pixel change rewards
+        logger.debug(f"Normal step: {total_changes} pixels → {log_reward:.2f} log reward")
+        return log_reward, False
     
     def render(self, mode: str = "human"):
         """Render the environment (placeholder)."""
