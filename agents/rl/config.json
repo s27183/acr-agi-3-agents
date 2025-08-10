@@ -1,0 +1,44 @@
+{
+  "training": {
+    "max_actions": 200,
+    "num_updates": 5,
+    "learning_rate": 0.0003,
+    "n_steps": 64,
+    "batch_size": 32,
+    "n_epochs": 5,
+    "gamma": 0.99,
+    "ent_coef": 0.01,
+    "vf_coef": 0.5,
+    "clip_range": 0.2,
+    "checkpoint_freq": 1,
+    "device": "auto",
+    "pytorch_cuda_alloc_conf": "expandable_segments:True",
+    "vec_env_type": "auto",
+    "use_dynamic_rollouts": true,
+    "scorecard_id": "811f4ad3-37b0-40aa-a33c-9470039dea04"
+  },
+  "inference": {
+    "scorecard_id": "811f4ad3-37b0-40aa-a33c-9470039dea04",
+    "max_actions": 1000
+  },
+  "dynamic_rollout": {
+    "enabled": true,
+    "target_trajectories_per_update": 3,
+    "max_rollout_steps": 300
+  },
+  "logging": {
+    "tensorboard_enabled": false,
+    "log_level": "INFO",
+    "grid_visualization_enabled": false
+  },
+  "paths": {
+    "models_dir": "./agents/rl/models",
+    "logs_dir": "./agents/rl/logs"
+  },
+  "representation": {
+    "num_residual_blocks": 10,
+    "filters": 256,
+    "kernel_size": 3,
+    "use_batch_norm": true
+  }
+}

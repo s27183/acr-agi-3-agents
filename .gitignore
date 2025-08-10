@@ -1,0 +1,29 @@
+# OS and environment
+.DS_Store
+*.log
+*.env
+!.env-example
+
+# Cache
+.ruff_cache/
+.mypy_cache/
+**/__pycache__/
+
+# Recordings
+recordings/*.recording.jsonl
+tests/recordings/*.recording.jsonl
+tests/recordings/not-a-recording.txt
+
+# models and logs
+agents/rl/models
+agents/rl/logs
+
+# Coding agents
+.claude
+.junie
+
+# Pycharm
+.cadence
+
+# virtual envs
+.venv
