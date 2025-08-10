@@ -13,7 +13,7 @@ The RL agent leverages deep reinforcement learning to learn ARC-AGI-3 puzzle-sol
 
 - **Swarm integration**: Built on swarm infrastructure using standard `uv run main.py` execution flow
 - **Minimal engineering**: RL agent learns purely from game interaction without hardcoded puzzle-solving priors
-- **Reward attribution**: Advanced reward system that attributes rewards to specific actions for better learning signals
+- **Reward attribution**: A reward system that attributes rewards to specific actions for better learning signals
 - **Dynamic rollout**: Quality-based rollout collection that focuses training on meaningful game experiences
 - **SubprocVecEnv integration**: Parallel environment execution with automatic fallback support for optimal CPU/GPU utilization
 - **Temporal stacking**: 10-layer CNN architecture with comprehensive temporal history tracking for visual pattern learning
