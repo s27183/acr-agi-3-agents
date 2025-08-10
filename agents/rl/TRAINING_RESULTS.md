@@ -1,4 +1,36 @@
+
 # Training Results: Evidence of Agent Learning
+
+## Early Training Analysis (756 Timesteps)
+
+**Objective Analysis of 756-Timestep Training Session**
+
+Analysis of fresh training with the new natural log reward system reveals early learning indicators but highlights the need for extended training duration.
+
+### **Key Findings at 756 Timesteps:**
+
+**Positive Learning Signals:**
+- **Level Completions Occurring**: Multiple level completion events detected with 4.83 bonus rewards applied to trajectory steps
+- **Policy Learning Activity**: clip_fraction ranging from 0.0 to 0.732, indicating active policy updates during learning phases  
+- **Value Function Stability**: value_loss in 0.500-0.560 range (successfully unstuck from 0.5, confirming natural log scaling effectiveness)
+- **Maintained Exploration**: entropy_loss decreasing from -1.38 to -1.01 (becoming more decisive while preserving exploration)
+
+**Areas of Concern:**
+- **Very Low Meaningful Ratio**: 0.0-0.45% of actions result in meaningful game state changes
+- **High Quality Variance**: Trajectory quality ranges 0.05-40.63, indicating inconsistent performance
+- **Limited Episode Depth**: Successful completions only 9-17 steps, suggesting early-level solutions only
+
+**Technical Health Indicators:**
+- ✅ Natural log reward scaling functional (rewards ~4.83 for completions)
+- ✅ Life loss filtering operational (3000+ pixel changes → 0.0 rewards)
+- ✅ Credit assignment working (trajectory-wide bonuses applied correctly)  
+- ✅ Training stability maintained (consistent 0.0003 learning rate, no divergence)
+
+**Conclusion**: The model shows promising early learning signs at 756 timesteps with successful level completions and proper value function learning. However, the very low meaningful interaction ratio (0.0-0.45%) suggests predominantly random exploration. Extended training duration needed to develop sophisticated gameplay patterns.
+
+---
+
+## Historical Training Analysis (Previous Reward System)
 
 Analysis of a comprehensive 29-update training session on the `ls20` game demonstrates measurable learning progression in ARC-AGI-3 puzzle solving. The training metrics show systematic improvement from initial random behavior to competent gameplay.
 
