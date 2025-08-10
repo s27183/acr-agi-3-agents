@@ -43,46 +43,53 @@ graph TB
     VecEnv --> EnvInstances[ARC Grid Environment Instances<br/>Each with own API connection]
     EnvInstances --> |REST API| ARCAPI[ARC-AGI-3 API<br/>Multiple Game Sessions]
     
-    %% Training System Selection
-    RLSwarm --> |Loads Config| TrainingChoice{Dynamic Rollout<br/>Enabled?}
-    TrainingChoice --> |Yes| DynamicTrainer[DynamicPPOTrainer<br/>Quality-Based Collection]
-    TrainingChoice --> |No| StandardTrainer[Standard SB3 PPO<br/>Fixed-Step Collection]
+    %% Custom Training System (Always Dynamic)
+    RLSwarm --> |Creates| DynamicTrainer[DynamicPPOTrainer<br/>Custom Training Controller]
     
-    %% Training Components
-    DynamicTrainer --> |Uses| PPOModel[Stable-Baselines3 PPO]
-    StandardTrainer --> |Uses| PPOModel
-    PPOModel --> |Integrates| EnhancedComponents[Enhanced Components]
+    %% Training Components - SB3 as Minimal Infrastructure
+    DynamicTrainer --> |Uses Infrastructure| SB3Infrastructure[SB3 PPO Model<br/>Policy/Value/Logging Only]
+    DynamicTrainer --> |Controls| CustomTrainingLoop[Custom PPO Training<br/>Replaces model.learn]
     
-    %% Enhanced RL Components  
-    EnhancedComponents --> RewardAttrib[Reward Attribution System<br/>Level Completion & Life Loss]
-    EnhancedComponents --> TemporalStack[10-Layer Temporal Stacking<br/>Fixed CNN Architecture]
-    EnhancedComponents --> DynamicRollout[Dynamic Rollout Collector<br/>Quality-Based Trajectories]
+    %% Custom Training Components
+    CustomTrainingLoop --> |Uses| CustomComponents[Custom RL Components]
     
-    %% Training Process
-    DynamicRollout --> |Collects| Trajectories[Variable-Length Trajectories<br/>Target-based Collection]
-    RewardAttrib --> |Injects| AttributedRewards[Attributed Rewards<br/>Pixel-based + Attribution]
+    %% Custom RL Components  
+    CustomComponents --> DynamicRollout[DynamicRolloutCollector<br/>Custom Quality-Based Collection]
+    CustomComponents --> RewardSystem[Custom Reward System<br/>Natural Log + Life Loss Filtering]
+    CustomComponents --> TemporalStack[10-Layer Temporal Stacking<br/>Custom CNN Architecture]
+    CustomComponents --> Calibration[Precise Calibration<br/>2*N+e Player Detection]
+    
+    %% Training Process Flow
+    DynamicRollout --> |Collects| Trajectories[Variable-Length Trajectories<br/>Quality-Based Selection]
+    RewardSystem --> |Applies| LogScaledRewards[Natural Log Rewards<br/>Trajectory-Wide Bonuses]
     TemporalStack --> |Processes| VisualHistory[10-Frame Visual History<br/>64x64 Grid Sequences]
+    Calibration --> |Provides| PlayerTracking[Exact Player Position<br/>Movement Detection]
     
     %% Output and Logging
-    PPOModel --> |Saves| TrainedModel[Trained PPO Model<br/>agents/rl/models/final_model.zip]
-    RLSwarm --> |Generates| ComprehensiveLogs[Comprehensive Logging<br/>Console + File + SB3 Metrics]
+    SB3Infrastructure --> |Saves| TrainedModel[Trained PPO Model<br/>agents/rl/models/final_model.zip]
+    SB3Infrastructure --> |Logs| SB3Metrics[SB3 Training Metrics<br/>CSV + JSON Files]
+    RLSwarm --> |Generates| ComprehensiveLogs[Comprehensive Logging<br/>Console + File Outputs]
     RLSwarm --> |Creates| SessionFiles[Playback-Ready<br/>JSONL Session Files]
     
     %% Styling
     classDef swarmInfra fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef rlCore fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef customTraining fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef sb3Infra fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
     classDef envLayer fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef enhancement fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    classDef customComponents fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
     classDef output fill:#fce4ec,stroke:#c2185b,stroke-width:2px
     classDef config fill:#f1f8e9,stroke:#33691e,stroke-width:2px
     
     class Main,MainPyLogic,RLSwarm swarmInfra
-    class TrainingChoice,DynamicTrainer,StandardTrainer,PPOModel rlCore
+    class DynamicTrainer,CustomTrainingLoop customTraining
+    class SB3Infrastructure,TrainedModel,SB3Metrics sb3Infra
     class EnvChoice,SubprocEnv,DummyEnv,VecEnv,EnvInstances,ARCAPI envLayer
-    class EnhancedComponents,DynamicRollout,RewardAttrib,TemporalStack,Trajectories,AttributedRewards,VisualHistory enhancement
-    class TrainedModel,ComprehensiveLogs,SessionFiles output
+    class CustomComponents,DynamicRollout,RewardSystem,TemporalStack,Calibration,Trajectories,LogScaledRewards,VisualHistory,PlayerTracking customComponents
+    class ComprehensiveLogs,SessionFiles output
     class Config,ScorecardChoice,UseConfigCard,CreateCard config
 ```
+
+> **📖 Note**: This diagram shows our high-level integration architecture. For detailed information about our minimal SB3 usage approach and custom training components, see the [RL Architecture Overview](#rl-architecture-overview) section below.
 ---
 
 ## Setup and Usage
@@ -369,15 +376,61 @@ RuntimeError: CUDA out of memory. Tried to allocate X.XX GiB...
 
 ## RL Architecture Overview
 
-### Early-Stage Prototyping Architecture
+### Minimal SB3 Usage Architecture
 
-The current approach prioritizes **stability and integration**, recognizing that early-stage rapid prototyping requires reliable, debuggable components that can integrate well with existing infrastructure.
+Our RL system uses Stable-Baselines3 (SB3) **minimally** - leveraging only core components for reliability and rapid prototyping, while implementing custom training logic optimized for ARC-AGI-3's unique visual reasoning requirements.
 
-**Stable-Baselines3 PPO**: We chose SB3's PPO implementation not for its reliability and integration with vectorized Gymnasium environments.
+**Minimal SB3 Surface**: We use SB3 only as reliable infrastructure (PPO model container, vectorized environments, logging) while customizing all training logic, rollout collection, reward systems, and environment interactions for ARC-specific needs.
 
-**Gymnasium Environment Interface**: The standardized Gymnasium API provides a **well-defined contract** between our game logic and RL training. This standard interface has been thoroughly tested across diverse environments, reducing integration bugs and providing familiar debugging patterns when issues arise.
+### What We Use vs What We Customize
 
-**SubprocessVecEnv for Fault Tolerance**: Rather than implementing custom parallel environment management, SubprocessVecEnv provides **process isolation** that prevents individual environment crashes from terminating training. This is crucial for early prototyping when environment logic may still contain edge-case bugs.
+| Component | SB3 Core (Used) | Custom Implementation (Ours) |
+|-----------|------------------|-------------------------------|
+| **Training Loop** | ❌ | ✅ `DynamicPPOTrainer` replaces `model.learn()` |
+| **Rollout Collection** | ❌ | ✅ `DynamicRolloutCollector` with quality-based trajectories |
+| **PPO Updates** | ❌ | ✅ Custom loss computation, optimization in `_ppo_update()` |
+| **Reward System** | ❌ | ✅ Natural log scaling, life loss filtering, trajectory bonuses |
+| **Environment** | ❌ | ✅ `ARCGridEnvironment` with ARC-AGI-3 API integration |
+| **Feature Extraction** | ❌ | ✅ 10-layer temporal stacking CNN architecture |
+| **Calibration** | ❌ | ✅ Precise player detection with 2*N+e formula |
+| | | |
+| **PPO Model Container** | ✅ | ❌ Policy/value networks, hyperparameters |
+| **Vectorized Environments** | ✅ | ❌ SubprocVecEnv/DummyVecEnv for parallelization |
+| **Neural Network APIs** | ✅ | ❌ `policy.evaluate_actions()`, optimizers |
+| **Logging Infrastructure** | ✅ | ❌ `model.logger` for metrics and CSV output |
+
+### Custom Training Flow
+
+Our training flow shows how we use SB3 minimally while controlling all training logic:
+
+```mermaid
+graph TB
+    Swarm[Swarm Orchestration] --> DynamicTrainer[DynamicPPOTrainer<br/>CUSTOM Training Loop]
+    DynamicTrainer --> Collector[DynamicRolloutCollector<br/>CUSTOM Quality-Based Collection]
+    Collector --> Environment[ARCGridEnvironment<br/>CUSTOM ARC-AGI-3 Integration]
+    
+    DynamicTrainer --> SB3Model[SB3 PPO Model<br/>Policy/Value Networks Only]
+    SB3Model --> PolicyAPI[policy.evaluate_actions<br/>policy.optimizer]
+    
+    DynamicTrainer --> CustomPPO[_ppo_update<br/>CUSTOM PPO Loss & Optimization]
+    CustomPPO --> RewardSystem[Natural Log Rewards<br/>CUSTOM Scaling & Attribution]
+    
+    Environment --> Calibration[Precise Calibration<br/>CUSTOM 2*N+e Detection]
+    
+    SB3Model --> Logging[SB3 Logger<br/>model.logger.record]
+    
+    classDef swarmInfra fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef customTraining fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef sb3Infra fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
+    classDef envLayer fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    classDef customComponents fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    
+    class Swarm swarmInfra
+    class DynamicTrainer,CustomPPO customTraining
+    class SB3Model,PolicyAPI,Logging sb3Infra
+    class Environment,Calibration envLayer
+    class Collector,RewardSystem customComponents
+```
 
 ### Integration with Existing Infrastructure
 
@@ -398,8 +451,6 @@ Existing Logging & Monitoring Infrastructure
 ```
 
 **Risk Mitigation for Prototyping**: This architecture provides **graceful degradation** patterns - if parallel environments fail, the system automatically falls back to sequential execution. If GPU resources are unavailable, training continues on CPU. These fallback mechanisms ensure that prototype development continues even when infrastructure is imperfect.
-
-**Development Velocity Benefits**: Standard interfaces and mature libraries mean faster debugging cycles, familiar error patterns, and extensive community documentation. This reduces the time spent on RL infrastructure debugging and maximizes the time available for tackling ARC-specific visual reasoning challenges.
 
 ### Reward Attribution System
 
