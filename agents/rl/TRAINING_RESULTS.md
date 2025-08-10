@@ -16,7 +16,7 @@ Analysis of fresh training with the new natural log reward system reveals early 
 - **Maintained Exploration**: entropy_loss decreasing from -1.38 to -1.01 (becoming more decisive while preserving exploration)
 
 **Areas of Concern:**
-- **Very Low Meaningful Ratio**: 0.0-0.45% of actions result in meaningful game state changes
+- **Very Low Meaningful Ratio**: 0.0-0.45% of actions result in meaningful game state changes. Note that a recent update to the dynamic rollout process has addressed this issue. 
 - **High Quality Variance**: Trajectory quality ranges 0.05-40.63, indicating inconsistent performance
 - **Limited Episode Depth**: Successful completions only 9-17 steps, suggesting early-level solutions only
 
