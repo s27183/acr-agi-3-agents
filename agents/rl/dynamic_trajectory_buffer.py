@@ -71,15 +71,16 @@ class DynamicTrajectoryBuffer:
         # Update trajectory quality metrics
         if total_changes == 0:
             self.wall_hits += 1
-        elif total_changes <= self.movement_threshold:
+        elif total_changes < self.movement_threshold:
+            # Pure movement without environmental interaction
             self.pure_movements += 1
         else:
-            # Environmental interaction detected
-            env_changes = total_changes - self.movement_threshold
+            # Environmental interaction detected (includes movement_threshold and above)
+            env_changes = max(0, total_changes - self.movement_threshold)
             self.env_interactions += 1
             self.total_env_changes += env_changes
             
-            # Track meaningful steps (environmental interaction)
+            # Track meaningful steps (environmental interaction including movement threshold)
             self.meaningful_steps.append((step_data, env_changes))
         
         # Immediate update triggers for critical events
