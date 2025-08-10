@@ -212,35 +212,51 @@ class DynamicRolloutCollector:
     
     def _distribute_level_completion_rewards(self, trajectory_steps: List[Dict], trajectory_data: List) -> List:
         """
-        Distribute level completion rewards equally across all steps in trajectory.
+        Give full level completion bonus to each step in trajectory (not averaged).
         
         Args:
             trajectory_steps: List of dicts with step info including level_complete flag
             trajectory_data: List of tuples (obs, action, reward, done, info)
             
         Returns:
-            Updated trajectory_data with distributed rewards
+            Updated trajectory_data with log-scaled rewards and level completion bonuses
         """
         # Check if any step completed a level
         level_complete_steps = [s for s in trajectory_steps if s.get('level_complete', False)]
         
         if not level_complete_steps:
-            # No level completion, return original data
-            return trajectory_data
+            # No level completion, just apply log scaling to existing rewards (with life loss filtering)
+            updated_trajectory = []
+            for obs, action, reward, done, info in trajectory_data:
+                if reward == 0:
+                    log_reward = 0.0
+                elif reward >= 3000:
+                    # Filter out life loss rewards
+                    log_reward = 0.0
+                else:
+                    log_reward = float(np.log(reward + 1))
+                updated_trajectory.append((obs, action, log_reward, done, info))
+            return updated_trajectory
         
-        # Calculate total level completion bonus (sum of pixel changes from level completion steps)
-        total_level_bonus = sum(s['base_reward'] for s in level_complete_steps)
+        # Calculate level completion bonus (already log-scaled from environment)
+        level_completion_bonus = level_complete_steps[0]['base_reward']  # This is already log-scaled
         
-        # Distribute bonus equally across all steps
-        bonus_per_step = total_level_bonus / len(trajectory_data)
+        logger.info(f"📊 Level completion detected! Giving each of {len(trajectory_data)} steps "
+                   f"bonus reward of {level_completion_bonus:.2f} (full bonus, not averaged)")
         
-        logger.info(f"📊 Level completion detected! Distributing {total_level_bonus:.1f} reward "
-                   f"across {len(trajectory_data)} steps ({bonus_per_step:.1f} per step)")
-        
-        # Update rewards in trajectory data
+        # Apply log scaling to base rewards and add full level completion bonus to each step
         updated_trajectory = []
-        for i, (obs, action, reward, done, info) in enumerate(trajectory_data):
-            new_reward = reward + bonus_per_step
+        for obs, action, reward, done, info in trajectory_data:
+            # Apply log scaling to the original step reward (with life loss filtering)
+            if reward == 0:
+                log_base_reward = 0.0
+            elif reward >= 3000:
+                # Filter out life loss rewards
+                log_base_reward = 0.0
+            else:
+                log_base_reward = float(np.log(reward + 1))
+            # Add full level completion bonus to every step
+            new_reward = log_base_reward + level_completion_bonus
             updated_trajectory.append((obs, action, new_reward, done, info))
         
         return updated_trajectory

@@ -7,7 +7,7 @@ The RL agent leverages deep reinforcement learning to learn ARC-AGI-3 puzzle-sol
 ### Goals
 
 - **Utilize existing swarm infrastructure**: Orchestrate RL learning and playing games through the swarm system
-- **Exhibit minimal signs of learning**: Demonstrate measurable improvement in puzzle-solving performance over time ([see training results](agents/rl/TRAINING_RESULTS.md))
+- **Exhibit signs of learning**: Demonstrate measurable improvement in puzzle-solving performance over time ([see training results](agents/rl/TRAINING_RESULTS.md))
 
 ### Features
 
@@ -113,12 +113,15 @@ uv run main.py --agent=rltraining --game=ls20
 # Train with custom tags for experiment tracking
 uv run main.py --agent=rltraining --game=ls20 --tags="experiment,baseline"
 
+# Train RL agent on multiple games
+uv run main.py --agent=rltraining --game=ls20,ft09,ab12
+
 # Monitor training progress (includes scorecard URL for web monitoring)
 tail -f agents/rl/logs/training_ls20.log
 ```
 ### Inference
 
-Run trained RL models using the swarm infrastructure:
+Use trained RL models to play games using the swarm infrastructure:
 
 ```bash
 # Run trained RL agent on a specific game (uses swarm-created scorecard by default)
@@ -126,6 +129,9 @@ uv run main.py --agent=rlagent --game=ls20
 
 # Run with custom tags for tracking
 uv run main.py --agent=rlagent --game=ls20 --tags="inference,evaluation"
+
+# Run trained RL agent on multiple games. Remember that you must train the agent to play the target games first.
+uv run main.py --agent=rlagent --game=ls20,ft09,ab12
 
 # Monitor inference progress (includes scorecard URL for web monitoring)
 tail -f agents/rl/logs/inference_ls20.log
