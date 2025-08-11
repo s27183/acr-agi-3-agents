@@ -17,6 +17,7 @@ tests/recordings/not-a-recording.txt
 # models and logs
 agents/rl/models
 agents/rl/logs
+agents/rl/visualization
 
 # Coding agents
 .claude
