@@ -422,7 +422,8 @@ class RLTrainingSwarmGymnasium(Swarm):
                     model=self.model,
                     env=env,
                     target_trajectories_per_update=dynamic_config.target_trajectories_per_update,
-                    max_rollout_steps=dynamic_config.max_rollout_steps
+                    max_rollout_steps=dynamic_config.max_rollout_steps,
+                    config=self.config  # Pass full config for life-loss trajectory exclusion
                 )
                 
                 # Set up checkpoint callback for automatic saving
