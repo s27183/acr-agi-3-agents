@@ -10,7 +10,7 @@
     "ent_coef": 0.01,
     "vf_coef": 0.5,
     "clip_range": 0.2,
-    "checkpoint_freq": 10,
+    "checkpoint_freq": 5,
     "device": "auto",
     "pytorch_cuda_alloc_conf": "expandable_segments:True",
     "vec_env_type": "auto",
