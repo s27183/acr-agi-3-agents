@@ -31,6 +31,9 @@ class RLAgent(Agent):
         # Override MAX_ACTIONS if specified in inference config
         self._override_max_actions_if_configured()
         
+        # Load deterministic setting for inference predictions
+        self._load_deterministic_setting()
+        
         # Set up dedicated inference logging
         self._setup_inference_logging()
         
@@ -151,6 +154,16 @@ class RLAgent(Agent):
                 logger.info(f"🎯 Using inference MAX_ACTIONS: {self.MAX_ACTIONS} (was: {original_max_actions})")
             else:
                 logger.info(f"📊 Using default MAX_ACTIONS for inference: {self.MAX_ACTIONS}")
+
+    def _load_deterministic_setting(self) -> None:
+        """Load deterministic setting from inference config."""
+        if (self.config and 
+            hasattr(self.config, 'inference_deterministic')):
+            self.deterministic = self.config.inference_deterministic
+            logger.info(f"🎯 Using inference deterministic: {self.deterministic}")
+        else:
+            self.deterministic = True  # Default to deterministic for consistent inference
+            logger.info(f"📊 Using default deterministic: {self.deterministic}")
 
     def _setup_inference_logging(self) -> None:
         """Set up dedicated inference logging for this game."""
@@ -294,7 +307,7 @@ class RLAgent(Agent):
                     obs_array = obs_array.astype(np.int32)
                     
                 logger.debug(f"Observation array: shape={obs_array.shape}, dtype={obs_array.dtype}")
-                model_action, _states = self.model.predict(obs_array, deterministic=False)
+                model_action, _states = self.model.predict(obs_array, deterministic=self.deterministic)
                 logger.debug(f"Model returned action: {model_action} (type: {type(model_action)})")
             except Exception as predict_error:
                 logger.error(f"Model predict failed: {predict_error}")
