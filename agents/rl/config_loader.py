@@ -318,6 +318,11 @@ class RLConfig:
         return self.inference_config.get('max_actions', self.max_actions)
     
     @property
+    def inference_deterministic(self) -> bool:
+        """Whether to use deterministic prediction during inference (default: True for consistent results)."""
+        return self.inference_config.get('deterministic', True)
+    
+    @property
     def total_timesteps(self) -> int:
         """Total timesteps for training (computed from i)."""
         return self.n_envs*self.n_steps * self.num_updates

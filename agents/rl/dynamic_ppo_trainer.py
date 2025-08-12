@@ -35,7 +35,8 @@ class DynamicPPOTrainer:
         model: PPO, 
         env: VecEnv,
         target_trajectories_per_update: int = 4,
-        max_rollout_steps: int = 1000
+        max_rollout_steps: int = 1000,
+        config: Dict[str, Any] = None
     ):
         """
         Initialize the dynamic PPO trainer.
@@ -45,19 +46,22 @@ class DynamicPPOTrainer:
             env: Vectorized environment
             target_trajectories_per_update: Target trajectories to collect per update
             max_rollout_steps: Maximum steps to prevent infinite rollouts
+            config: Configuration dictionary containing dynamic rollout settings
         """
         self.model = model
         self.env = env
         self.n_envs = env.num_envs
+        self.config = config or {}
         
         # Dynamic rollout configuration
         self.target_trajectories_per_update = target_trajectories_per_update
         self.max_rollout_steps = max_rollout_steps
         
-        # Initialize dynamic rollout collector
+        # Initialize dynamic rollout collector with config
         self.rollout_collector = DynamicRolloutCollector(
             n_envs=self.n_envs,
-            N=64  # Player size
+            N=64,  # Player size
+            config=self.config
         )
         
         # Training statistics

@@ -10,6 +10,7 @@ import numpy as np
 from typing import Dict, Optional, Tuple, List, Any
 from collections import deque
 from agents.rl.terrain_analyzer import TerrainAnalyzer
+from agents.rl.autonomous_player_extractor import extract_player_coordinates
 
 from agents.structs import FrameData
 
@@ -104,10 +105,17 @@ class Calibration:
                 logger.warning("Calibration failed - no action produced pixel changes")
                 return False, test_frame
 
-            # Step 2 & 3: Analyze calibrated move using 2*N+e formula and extract player geometry
-            success = self._analyze_calibrated_move(
-                reset_grid, calibrated_grid, calibrated_action, reset_score, calibrated_frame.score
-            )
+            # Step 2 & 3: Use autonomous extraction instead of traditional 2*N+e analysis
+            logger.info("Using autonomous player extraction for calibration")
+            extraction_result = self.extract_player_coordinates_autonomous(reset_frame, calibrated_frame)
+            success = extraction_result['success']
+            
+            if not success:
+                # Fallback to traditional method if autonomous extraction fails
+                logger.warning("Autonomous extraction failed, falling back to traditional 2*N+e analysis")
+                success = self._analyze_calibrated_move(
+                    reset_grid, calibrated_grid, calibrated_action, reset_score, calibrated_frame.score
+                )
 
             if success:
                 self.calibrated = True
@@ -120,6 +128,9 @@ class Calibration:
                 logger.info(f"Calibration successful! Player size N={self.player_size}, "
                           f"energy consumption e={self.energy_consumption}")
                 logger.info(f"Player top-left position: {self.player_location['current_position']}")
+                if extraction_result['success']:
+                    logger.info(f"Autonomous extraction confidence: {extraction_result['confidence']:.3f}")
+                    logger.info(f"Movement direction detected: {extraction_result['movement_direction']}")
                 logger.info(f"Training will start from post-calibration state")
                 return True, test_frame
             else:
@@ -129,6 +140,105 @@ class Calibration:
         except Exception as e:
             logger.error(f"Calibration failed with exception: {e}")
             return False, test_frame
+
+    def extract_player_coordinates_autonomous(self, frame_0, frame_1) -> Dict[str, Any]:
+        """
+        Extract player coordinates using the autonomous pattern-based algorithm.
+        
+        This method provides a modern alternative to the traditional 2*N+e calibration
+        approach, working without prior knowledge of player size, energy consumption,
+        or movement direction.
+        
+        Args:
+            frame_0: Initial frame (before movement)
+            frame_1: Frame after movement
+            
+        Returns:
+            dict: Player coordinate extraction results with success status
+        """
+        try:
+            # Convert frames to grids if needed
+            grid_0 = self._frame_to_grid_data(frame_0)
+            grid_1 = self._frame_to_grid_data(frame_1)
+            
+            # Use autonomous extraction algorithm
+            result = extract_player_coordinates(grid_0, grid_1)
+            
+            if result['success']:
+                # Update calibration state with extracted information
+                self.player_size = result['player_size']
+                self.energy_consumption = result['energy_consumption']
+                
+                # Convert to compatible location format
+                if result['player_coords']:
+                    # Get top-left corner and shape
+                    coords = result['player_coords']
+                    if coords:
+                        # Find top-left corner
+                        rows = [coord[0] for coord in coords]
+                        cols = [coord[1] for coord in coords]
+                        top_left = (min(rows), min(cols))
+                        
+                        # Create relative shape coordinates
+                        shape = []
+                        for r, c in coords:
+                            rel_r = r - top_left[0] 
+                            rel_c = c - top_left[1]
+                            shape.append((rel_r, rel_c))
+                        
+                        self.player_location = {
+                            'current_position': top_left,
+                            'previous_position': None,  # Will be updated on subsequent moves
+                            'size': result['player_size'],
+                            'shape': shape
+                        }
+                        
+                        self.calibrated = True
+                        logger.info(f"Autonomous extraction successful: player size={self.player_size}, "
+                                   f"position={top_left}, confidence={result['confidence']:.3f}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Autonomous player extraction failed: {e}")
+            return {
+                'success': False,
+                'reason': 'extraction_exception',
+                'error': str(e)
+            }
+    
+    def _frame_to_grid_data(self, frame_data) -> np.ndarray:
+        """
+        Convert frame data to numpy grid, handling both FrameData objects and raw grids.
+        
+        Args:
+            frame_data: Either a FrameData object or raw grid data
+            
+        Returns:
+            np.ndarray: 64x64 grid
+        """
+        if hasattr(frame_data, 'frame'):
+            # FrameData object
+            return self._frame_to_grid(frame_data)
+        elif isinstance(frame_data, np.ndarray):
+            # Already a numpy array
+            return frame_data.astype(np.int32)
+        elif isinstance(frame_data, list):
+            # List format
+            grid = np.array(frame_data, dtype=np.int32)
+            if grid.shape == (64, 64):
+                return grid
+            elif grid.shape == (4096,):
+                return grid.reshape(64, 64)
+            else:
+                # Pad/crop to 64x64
+                padded = np.zeros((64, 64), dtype=np.int32)
+                h, w = min(grid.shape[0], 64), min(grid.shape[1] if len(grid.shape) > 1 else 1, 64)
+                padded[:h, :w] = grid[:h, :w] if len(grid.shape) > 1 else grid[:h*w].reshape(h, w)
+                return padded
+        else:
+            # Default to zeros
+            return np.zeros((64, 64), dtype=np.int32)
 
     def _analyze_calibrated_move(self, reset_grid, calibrated_grid, action, reset_score, calibrated_score):
         """
@@ -411,6 +521,89 @@ class Calibration:
     def _initialize_hotspot_map(self, grid_shape):
         """Initialize hotspot attention map."""
         self.hotspot_map = np.zeros(grid_shape, dtype=np.float32)
+
+    def separate_changes_autonomous(self, old_grid, new_grid) -> Dict[str, Any]:
+        """
+        Separate player movement from environment changes using autonomous detection.
+        
+        This is a modern alternative to the traditional separate_changes method that
+        doesn't require knowing the action taken in advance.
+        
+        Args:
+            old_grid: Previous grid state
+            new_grid: Current grid state
+            
+        Returns:
+            dict: Enhanced change analysis with autonomous detection results
+        """
+        try:
+            # Use autonomous extraction
+            result = extract_player_coordinates(old_grid, new_grid)
+            
+            if result['success']:
+                # Update player location if movement detected
+                if result['player_coords'] and self.player_location:
+                    old_pos = self.player_location['current_position']
+                    
+                    # Find new top-left position
+                    coords = result['player_coords']
+                    rows = [coord[0] for coord in coords]
+                    cols = [coord[1] for coord in coords]
+                    new_pos = (min(rows), min(cols))
+                    
+                    # Update location
+                    self.player_location['previous_position'] = old_pos
+                    self.player_location['current_position'] = new_pos
+                    
+                    # Create relative shape
+                    shape = []
+                    for r, c in coords:
+                        rel_r = r - new_pos[0]
+                        rel_c = c - new_pos[1] 
+                        shape.append((rel_r, rel_c))
+                    self.player_location['shape'] = shape
+                
+                # Return enhanced analysis
+                return {
+                    'total_pixels_changed': result['total_changes'],
+                    'player_movement_pixels': 2 * result['player_size'],
+                    'environment_interaction_pixels': result['energy_consumption'],
+                    'movement_direction': result['movement_direction'],
+                    'player_size': result['player_size'],
+                    'confidence': result['confidence'],
+                    'calibrated': True,
+                    'wall_collision': False,
+                    'autonomous_success': True
+                }
+            else:
+                # No movement detected or failed extraction
+                wall_collision = (result.get('total_changes', 0) == 0)
+                return {
+                    'total_pixels_changed': result.get('total_changes', 0),
+                    'player_movement_pixels': 0,
+                    'environment_interaction_pixels': result.get('total_changes', 0),
+                    'movement_direction': 0,
+                    'player_size': 0,
+                    'confidence': 0.0,
+                    'calibrated': self.calibrated,
+                    'wall_collision': wall_collision,
+                    'autonomous_success': False
+                }
+                
+        except Exception as e:
+            logger.error(f"Autonomous change separation failed: {e}")
+            return {
+                'total_pixels_changed': 0,
+                'player_movement_pixels': 0,
+                'environment_interaction_pixels': 0,
+                'movement_direction': 0,
+                'player_size': 0,
+                'confidence': 0.0,
+                'calibrated': self.calibrated,
+                'wall_collision': True,
+                'autonomous_success': False,
+                'error': str(e)
+            }
 
     def separate_changes(self, old_grid, new_grid, action_taken):
         """

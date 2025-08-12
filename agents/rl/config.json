@@ -10,7 +10,7 @@
     "ent_coef": 0.01,
     "vf_coef": 0.5,
     "clip_range": 0.2,
-    "checkpoint_freq": 1,
+    "checkpoint_freq": 5,
     "device": "auto",
     "pytorch_cuda_alloc_conf": "expandable_segments:True",
     "vec_env_type": "auto",
@@ -19,12 +19,14 @@
   },
   "inference": {
     "scorecard_id": "811f4ad3-37b0-40aa-a33c-9470039dea04",
-    "max_actions": 200
+    "max_actions": 200,
+    "deterministic": false
   },
   "dynamic_rollout": {
     "enabled": true,
     "target_trajectories_per_update": 3,
-    "max_rollout_steps": 300
+    "max_rollout_steps": 300,
+    "exclude_life_loss_trajectories": true
   },
   "logging": {
     "tensorboard_enabled": false,

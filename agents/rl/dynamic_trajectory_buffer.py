@@ -197,19 +197,29 @@ class DynamicRolloutCollector:
     and integrates with PPO training to provide quality-based rollouts.
     """
     
-    def __init__(self, n_envs: int, N: int = 64):
+    def __init__(self, n_envs: int, N: int = 64, config: Dict[str, Any] = None):
         """
         Initialize the dynamic rollout collector.
         
         Args:
             n_envs: Number of parallel environments
             N: Player size for movement threshold calculation
+            config: Configuration dictionary containing dynamic_rollout settings
         """
         self.n_envs = n_envs
+        self.config = config or {}
         self.buffers = [DynamicTrajectoryBuffer(N) for _ in range(n_envs)]
         self.collected_trajectories: List[Dict[str, Any]] = []
         
+        # Log configuration
+        if hasattr(self.config, 'config'):
+            # RLConfig object - access the underlying dict
+            exclude_life_loss = self.config.config.get('dynamic_rollout', {}).get('exclude_life_loss_trajectories', False)
+        else:
+            # Plain dict
+            exclude_life_loss = self.config.get('dynamic_rollout', {}).get('exclude_life_loss_trajectories', False)
         logger.info(f"DynamicRolloutCollector initialized for {n_envs} environments")
+        logger.info(f"Life-loss trajectory exclusion: {'ENABLED' if exclude_life_loss else 'DISABLED'}")
     
     def _distribute_level_completion_rewards(self, trajectory_steps: List[Dict], trajectory_data: List) -> List:
         """
@@ -314,6 +324,19 @@ class DynamicRolloutCollector:
                 )
                 
                 if should_update:
+                    # Check if this is a life-loss trajectory that should be discarded
+                    if hasattr(self.config, 'config'):
+                        # RLConfig object - access the underlying dict
+                        exclude_life_loss = self.config.config.get('dynamic_rollout', {}).get('exclude_life_loss_trajectories', False)
+                    else:
+                        # Plain dict
+                        exclude_life_loss = self.config.get('dynamic_rollout', {}).get('exclude_life_loss_trajectories', False)
+                    
+                    if reason == "LIFE_LOSS_EVENT" and exclude_life_loss:
+                        logger.info(f"🚫 DISCARDING life-loss trajectory from env {env_idx}")
+                        self.buffers[env_idx].reset()  # Clear the trajectory buffer
+                        continue  # Skip collection, environment continues naturally
+                    
                     # Trajectory complete - check for level completion and distribute rewards
                     logger.info(f"🎯 Processing trajectory from env {env_idx}")
                     
